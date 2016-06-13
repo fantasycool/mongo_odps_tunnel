@@ -99,8 +99,6 @@ for c in root_table.child_tables:
     for name in c.column_names:
         print "name is :%s" % name
 
-sys.exit()
-
 dynamic = db.mongo_parent_table_name
 
 def getValue(mongo_name, temp):
