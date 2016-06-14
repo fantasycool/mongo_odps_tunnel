@@ -8,12 +8,14 @@ import json
 
 
 config_file = sys.argv[1]
+print "config file is %s" % config_file
 config = ConfigParser.RawConfigParser()
 config.read(config_file)
 SECTION_NAME = "DEFAULT"
 
-client = MongoClient(config.get(SECTION_NAME, "mongo_server_ip"), config.get(SECTION_NAME, "mongo_port"))
-db = client.social
+client = MongoClient(config.get(SECTION_NAME, "mongo_server_ip"), config.getint(SECTION_NAME, "mongo_port"))
+db_name = config.get(SECTION_NAME, "mongo_db")
+db = client.db_name
 
 import datetime
 import time
@@ -71,8 +73,6 @@ child_tables = json.loads(config.get(SECTION_NAME, "child_tables"))
 child_table_names = json.loads(config.get(SECTION_NAME, "child_table_names"))
 parent_table_name = json.loads(config.get(SECTION_NAME, "parent_table_name"))
 
-# child_table_names = ['s_dynamic_likes', 's_dynamic_comments']
-# parent_table_name = ['s_dynamic']
 idColumn = config.get(SECTION_NAME, "id_column")
 accessId = config.get(SECTION_NAME, "odps_access_id")
 accessKey = config.get(SECTION_NAME, "odps_access_key")
@@ -95,10 +95,11 @@ for (index,name) in enumerate(child_table_names, start=0):
 #print child table info
 for c in root_table.child_tables:
     print "mongo_table_name is %s,odps table_name is %s" % (c.mongo_table_name, c.table_name)
-    print "columns is : \n"
+    print "columns is : "
     for name in c.column_names:
         print "name is :%s" % name
 
+#get mongo db table name
 dynamic = db.mongo_parent_table_name
 
 def getValue(mongo_name, temp):
@@ -132,8 +133,6 @@ def getChildHierarchy(src_hierarchy, tr):
             break
     return t
 
-
-
 def getChildRecords(child_table, tr):
     if not child_table.is_child:
         return None
@@ -160,9 +159,6 @@ def getChildRecords(child_table, tr):
 odps = ODPS(accessId, accessKey, odps_project, end_point or 'http://service.odps.aliyun.com/api')
 
 from odps.models import Schema, Column, Partition
-
-
-
 def get_odps_columns(column_names, is_child=False):
     p_odps_columns = []
     for (index, key) in enumerate(column_names):
@@ -222,8 +218,6 @@ def init_root_table_odps(root_table):
     for c in root_table.child_tables:
         c.odps_table = odps.get_table(c.table_name)
 
-
-
 import time
 from odps.tunnel import TableTunnel
 
@@ -236,7 +230,7 @@ init_root_table_odps(root_table)
 init_partition(root_table)
 
 #parent table data written
-print "start to get parent table data....."
+print "start to sync parent table data....."
 result = dynamic.find({})
 tunnel = TableTunnel(odps)
 upload_session = tunnel.create_upload_session(root_table.parent_odps_table.table_name, \
@@ -252,6 +246,7 @@ with upload_session.open_record_writer(block_id=1) as writer:
         writer.write(record)
 upload_session.commit([1])
 
+print "start to sync childs table data...."
 #child tables written
 for ct in root_table.child_tables:
     result = dynamic.find({})
