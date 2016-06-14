@@ -184,10 +184,13 @@ def create_partition_value(partition, odps_table):
         print "partition 不能为空"
     else:
         print "尝试创建新的分区pt=%s" % partition
-        odps_table.create_partition("pt=" + partition, if_not_exists=True)
+        print "started to drop partition %s" % partition
+        odps_table.delete_partition('pt=' + partition,if_exists=True)
+        print "started to create partition %s" % partition
+        print odps_table.create_partition("pt=" + partition, if_not_exists=True)
 
 def create_table_if_not_exists(root_table):
-    if not odps.exist_table(root_table.parent_odps_table):
+    if not odps.exist_table(root_table.parent_odps_table.table_name):
         print "parent table does not exist,so we create one %s" % root_table.parent_odps_table.table_name
         columns = get_odps_columns(root_table.parent_odps_table.column_names)
         root_table.parent_odps_table.columns = columns
@@ -232,6 +235,7 @@ init_partition(root_table)
 print "start to sync parent table data....."
 result = dynamic.find()
 tunnel = TableTunnel(odps)
+print "partition values is %s" % get_partition_value(bizdate)
 upload_session = tunnel.create_upload_session(root_table.parent_odps_table.table_name, \
  partition_spec='pt=' + get_partition_value(bizdate))
 with upload_session.open_record_writer(block_id=1) as writer:
