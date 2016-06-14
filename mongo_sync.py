@@ -15,7 +15,7 @@ SECTION_NAME = "DEFAULT"
 
 client = MongoClient(config.get(SECTION_NAME, "mongo_server_ip"), config.getint(SECTION_NAME, "mongo_port"))
 db_name = config.get(SECTION_NAME, "mongo_db")
-db = client.db_name
+db = client[db_name]
 
 import datetime
 import time
@@ -100,7 +100,7 @@ for c in root_table.child_tables:
         print "name is :%s" % name
 
 #get mongo db table name
-dynamic = db.mongo_parent_table_name
+dynamic = db[mongo_parent_table_name]
 
 def getValue(mongo_name, temp):
     temp_r = None
@@ -144,7 +144,6 @@ def getChildRecords(child_table, tr):
     #split src_hierarchy
     rootValues = getChildHierarchy(child_table.src_hierarchy, tr)
     if not rootValues:
-        print "tr has no records,so we do nothing"
         return None
     records = []
     for r in rootValues:
@@ -231,12 +230,12 @@ init_partition(root_table)
 
 #parent table data written
 print "start to sync parent table data....."
-result = dynamic.find({})
+result = dynamic.find()
 tunnel = TableTunnel(odps)
 upload_session = tunnel.create_upload_session(root_table.parent_odps_table.table_name, \
  partition_spec='pt=' + get_partition_value(bizdate))
 with upload_session.open_record_writer(block_id=1) as writer:
-     for tr in result:
+    for tr in result:
         num = num + 1
         if num % 1000 == 0:
             print "%d num records has been sent to odps..." % num
@@ -249,16 +248,17 @@ upload_session.commit([1])
 print "start to sync childs table data...."
 #child tables written
 for ct in root_table.child_tables:
-    result = dynamic.find({})
+    result = dynamic.find()
     upload_session = tunnel.create_upload_session(ct.table_name, partition_spec='pt=' + get_partition_value(bizdate))
     num = 0
     with upload_session.open_record_writer(block_id=1) as writer:
         for tr in result:
             num = num + 1
             if num % 1000 == 0:
-                print "%d num records has been sent to odps..."
+                print "%d num records has been sent to odps..." % num
             records = getChildRecords(ct, tr)
             if records:
                 for r in records:
                     writer.write(r)
     upload_session.commit([1])
+print "============sync finished!============="
